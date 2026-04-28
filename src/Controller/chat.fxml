@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="Controller.UIController"
+            prefWidth="1100" prefHeight="700"
+            style="-fx-background-color: linear-gradient(to bottom, #0f2027, #203a43, #2c5364);">
+
+    <!-- TOP BAR -->
+    <top>
+        <HBox spacing="15" alignment="CENTER_LEFT"
+              style="-fx-background-color: rgba(32,44,51,0.9); -fx-background-radius: 0 0 15 15;">
+            <padding>
+                <Insets top="12" right="20" bottom="12" left="20"/>
+            </padding>
+
+            <Label text="💬 ChatApp"
+                   style="-fx-text-fill:white; -fx-font-size:20px; -fx-font-weight:bold;"/>
+
+            <Region HBox.hgrow="ALWAYS"/>
+
+            <Button text="⚙"
+                    style="-fx-background-color: transparent; -fx-text-fill:white; -fx-font-size:16px;"/>
+        </HBox>
+    </top>
+
+    <!-- LEFT PANEL -->
+    <left>
+        <VBox spacing="12" prefWidth="300"
+              style="-fx-background-color: rgba(17,27,33,0.95); -fx-background-radius: 0 15 15 0;">
+
+            <padding>
+                <Insets top="15" right="10" bottom="15" left="10"/>
+            </padding>
+
+            <TextField promptText="🔍 Search"
+                       style="-fx-background-radius:10; -fx-padding:8;"/>
+
+            <Label text="Contacts"
+                   style="-fx-text-fill:#d1d7db; -fx-font-size:14px;"/>
+
+            <ListView fx:id="contactsList"
+                      style="-fx-background-radius:10;"/>
+        </VBox>
+    </left>
+
+    <!-- CENTER CHAT -->
+    <center>
+        <BorderPane style="-fx-padding:10;">
+
+            <!-- MESSAGES -->
+            <center>
+                <ScrollPane fitToWidth="true"
+                            style="-fx-background: transparent; -fx-background-color: transparent;">
+                    <content>
+                        <VBox fx:id="messagesBox" spacing="12">
+                            <padding>
+                                <Insets top="10" right="10" bottom="10" left="10"/>
+                            </padding>
+                        </VBox>
+                    </content>
+                </ScrollPane>
+            </center>
+
+            <!-- INPUT BAR -->
+
+            <bottom>
+                <HBox spacing="10" alignment="CENTER"
+                      style="-fx-background-color: rgba(32,44,51,0.95); -fx-background-radius: 15 15 0 0;">
+
+                    <padding>
+                        <Insets top="12" right="12" bottom="12" left="12"/>
+                    </padding>
+
+                    <!-- 📞 CALL BUTTONS -->
+                    <Button text="📞 Audio"
+                            onAction="#startAudioCall"
+                            style="-fx-background-color:#00a884; -fx-text-fill:white;"/>
+
+                    <Button text="🎥 Video"
+                            onAction="#startVideoCall"
+                            style="-fx-background-color:#128C7E; -fx-text-fill:white;"/>
+                    <Button fx:id="endCallBtn"
+                            text="❌ End"
+                            visible="false"
+                            onAction="#endCall"
+                            style="-fx-background-color:red; -fx-text-fill:white;"/>
+                    <!-- 💬 MESSAGE INPUT -->
+                    <TextField fx:id="messageField"
+                               HBox.hgrow="ALWAYS"
+                               promptText="Type a message..."
+                               style="-fx-background-radius:20; -fx-padding:10;"/>
+
+                    <Button text="➤"
+                            onAction="#sendMessage"
+                            style="-fx-background-color:#00a884; -fx-text-fill:white; -fx-background-radius:50; -fx-padding:10 15;"/>
+
+                </HBox>
+            </bottom>
+        </BorderPane>
+    </center>
+
+</BorderPane>
