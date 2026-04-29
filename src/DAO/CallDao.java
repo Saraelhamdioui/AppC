@@ -42,8 +42,8 @@ public class CallDao {
         String sql =
                 "UPDATE calls SET " +
                         "status='ended', " +
-                        "end_time=NOW(), " +
-                        "duration = TIMESTAMPDIFF(SECOND, start_time, end_time) " +
+                        "duration = TIMESTAMPDIFF(SECOND, start_time, NOW()), " +
+                        "end_time=NOW() " +
                         "WHERE id=?";
 
         try (Connection con = DBConnection.getConnection();

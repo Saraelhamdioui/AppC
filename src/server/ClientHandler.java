@@ -19,7 +19,7 @@ public class ClientHandler implements Runnable {
 
     private MessageDao messageDao = new MessageDao();
     private UserDao userDao = new UserDao();
-    private CallDao callDao = new CallDao(); // ✅ ضفناها
+    private CallDao callDao = new CallDao();
 
     public ClientHandler(Socket socket) {
         this.socket = socket;
@@ -84,7 +84,7 @@ public class ClientHandler implements Runnable {
                 // ================= CALL REQUEST =================
                 else if (msg.startsWith(Protocol.CALL_REQUEST)) {
 
-                    String[] p = msg.split(":"); // ✅ مهم
+                    String[] p = msg.split(":");
 
                     String caller = p[1];
                     String callee = p[2];
@@ -109,7 +109,6 @@ public class ClientHandler implements Runnable {
 
                     int callId;
 
-                    // ✅ تأكد ما يتسجلش جوج مرات
                     if (Server.activeCalls.containsKey(key)) {
                         callId = Server.activeCalls.get(key);
                     } else if (Server.activeCalls.containsKey(reverseKey)) {
@@ -127,7 +126,16 @@ public class ClientHandler implements Runnable {
                             Protocol.CALL_ACCEPT + ":" + caller + ":" + callId
                     );
                 }
+                else if (msg.startsWith(Protocol.CALL_REJECT)) {
 
+                    String[] p = msg.split(":");
+                    if (p.length < 3) continue;
+
+                    String caller = p[1];
+                    String callee = p[2];
+
+                    Server.sendPrivate(caller, Protocol.CALL_REJECT + ":" + callee);
+                }
                 // ================= CALL END =================
                 else if (msg.startsWith(Protocol.CALL_END)) {
 

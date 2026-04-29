@@ -120,7 +120,6 @@ public class UIController {
             messagesBox.getChildren().remove(callBox);
             callBox = null;
         }
-        selectedUser = null;
     }
 
     // 🎤 Audio
@@ -279,10 +278,11 @@ public class UIController {
 
     @FXML
     public void startVideoCall() {
-
-        if (selectedUser == null) return;
-
-        client.sendCallRequest(username, selectedUser, "video");
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Video Call");
+        alert.setHeaderText(null);
+        alert.setContentText("Video call is not implemented yet,please wait till next update, thank youuuu!.");
+        alert.showAndWait();
     }
 
     @FXML
@@ -296,7 +296,7 @@ public class UIController {
 
     // ================= AUDIO CALL =================
     private void startAudioCallSession() {
-
+        audioStopped = false;
         try {
             Socket audioSocket = new Socket("localhost", 5001);
 
