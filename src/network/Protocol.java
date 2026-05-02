@@ -19,4 +19,7 @@ public class Protocol {
 
     // optional future upgrade
     public static final String CALL_BUSY = "CALL_BUSY";
+    public static final String ADD_CONTACT = "ADD_CONTACT";
+    public static final String CONTACTS = "CONTACTS";
+    public static final String DELETE_CONTACT = "DELETE_CONTACT";
 }

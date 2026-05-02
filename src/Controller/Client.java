@@ -45,6 +45,12 @@ public class Client {
             }
         }).start();
     }
+    public void addContact(String me, String other) {
+        out.println(Protocol.ADD_CONTACT + ":" + me + ":" + other);
+    }
+    public void deleteContact(String me, String other) {
+        out.println(Protocol.DELETE_CONTACT + ":" + me + ":" + other);
+    }
     public void sendCallRequest(String caller, String callee, String type) {
         out.println(Protocol.CALL_REQUEST + ":" + caller + ":" + callee + ":" + type);
     }

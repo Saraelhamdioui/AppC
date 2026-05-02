@@ -1,5 +1,5 @@
 package Controller;
-
+import java.util.List;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
@@ -17,6 +17,7 @@ public class UIController {
     @FXML private TextField messageField;
     @FXML private ListView<String> contactsList;
     @FXML private Button endCallBtn;
+    @FXML private Button deleteBtn;
 
     private Client client;
     private String username;
@@ -27,7 +28,7 @@ public class UIController {
     private long startTime;
     private AudioReceiver receiver;
     private volatile boolean audioStopped = false;
-
+    private List<String> contactsUI = new ArrayList<>();
     private void drawCallRequest(String caller) {
 
         HBox box = new HBox();
@@ -138,18 +139,27 @@ public class UIController {
 
     private List<String> allUsersUI = new ArrayList<>();
     private Set<String> onlineUsers = new HashSet<>();
-
+    private Set<String> contactsFromServer = new HashSet<>();
+    private Set<String> chatUsers = new HashSet<>();
+    private Set<String> deletedUsers = new HashSet<>();
     // ================= INIT =================
     public void setUsername(String username) {
 
         this.username = username;
+        client = new Client();   // 1️⃣ إنشاء client
+
+        client.login(username);
 
         contactsList.setOnMouseClicked(e -> {
 
-            int index = contactsList.getSelectionModel().getSelectedIndex();
-            if (index == -1) return;
+            String item = contactsList.getSelectionModel().getSelectedItem();
 
-            selectedUser = allUsersUI.get(index);
+            if (item == null) return;
+
+            selectedUser = item
+                    .replace("● ", "")
+                    .replaceAll("\\(\\d+\\)", "")
+                    .trim();
 
             messagesBox.getChildren().clear();
 
@@ -166,15 +176,17 @@ public class UIController {
             markSeen();
         });
 
-        client = new Client();
-        client.login(username);
 
         client.listen(msg -> {
             Platform.runLater(() -> {
 
                 // USERS
                 if (msg.startsWith("USERS:")) {
-                    updateUsers(msg);
+                    updateOnlineUsers(msg); // 🟢 غير status
+                }
+                else if (msg.startsWith("CONTACTS:")) {
+                    updateContacts(msg); // 👥 اللي كيبان فليست
+
 
                     // HISTORY
                 } else if (msg.startsWith("HISTORY:")) {
@@ -247,12 +259,73 @@ public class UIController {
                     );
                     alert.showAndWait();
 
+
                     // CHAT
                 } else {
                     addMessage(msg);
                 }
             });
         });
+    }
+    @FXML
+    public void addContact() {
+
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setHeaderText("Enter username to add:");
+
+        Optional<String> result = dialog.showAndWait();
+
+        result.ifPresent(user -> {
+            client.addContact(username, user);
+            if (!contactsUI.contains(user) && !user.equals(username)) {
+                contactsUI.add(user);
+                updateUsersListUI();
+            }
+        });
+    }
+    @FXML
+    public void deleteContact() {
+
+        System.out.println("🔥 DELETE CLICKED");
+
+        if (selectedUser == null) {
+            System.out.println("❌ NO SELECTION");
+            return;
+        }
+
+        String userToDelete = selectedUser;
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setHeaderText("Delete " + userToDelete + " ?");
+
+        Optional<ButtonType> result = alert.showAndWait();
+
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+
+            client.deleteContact(username, userToDelete);
+
+            // 🔥 IMPORTANT: blacklist
+            deletedUsers.add(userToDelete);
+
+            // remove locally
+            contactsFromServer.remove(userToDelete);
+            chatUsers.remove(userToDelete);
+            conversations.remove(userToDelete);
+            unreadCount.remove(userToDelete);
+
+            if (userToDelete.equals(selectedUser)) {
+                selectedUser = null;
+                messagesBox.getChildren().clear();
+            }
+
+            updateUsersListUI();
+
+            System.out.println("✅ DELETED");
+        }
+    }
+    @FXML
+    public void initialize() {
+        System.out.println("UIController LOADED");
     }
 
     // ================= CHAT =================
@@ -293,8 +366,34 @@ public class UIController {
             endCallBtn.setVisible(false);
         }
     }
+    private void updateOnlineUsers(String msg) {
 
+        String[] parts = msg.split("\\|");
+
+        String onlinePart = parts[0].replace("USERS:", "");
+
+        onlineUsers.clear();
+
+        if (!onlinePart.isEmpty()) {
+            onlineUsers.addAll(Arrays.asList(onlinePart.split(",")));
+        }
+
+        updateUsersListUI();
+    }
+    private void updateContacts(String msg) {
+
+        String list = msg.replace("CONTACTS:", "");
+
+        contactsFromServer.clear();
+
+        if (!list.isEmpty()) {
+            contactsFromServer.addAll(Arrays.asList(list.split(",")));
+        }
+
+        updateUsersListUI();
+    }
     // ================= AUDIO CALL =================
+
     private void startAudioCallSession() {
         audioStopped = false;
         try {
@@ -343,6 +442,11 @@ public class UIController {
 
         String otherUser = sender.equals(username) ? receiver : sender;
 
+        // 🔥 BLOCK DELETED USERS
+        if (deletedUsers.contains(otherUser)) return;
+
+        chatUsers.add(otherUser);
+
         conversations.putIfAbsent(otherUser, new ArrayList<>());
 
         Message m = new Message(sender, receiver, content);
@@ -351,17 +455,13 @@ public class UIController {
         if (!sender.equals(username) && !otherUser.equals(selectedUser)) {
             unreadCount.put(otherUser,
                     unreadCount.getOrDefault(otherUser, 0) + 1);
-            updateUsersListUI();
-        }
-
-        if (!sender.equals(username) && otherUser.equals(selectedUser)) {
-            client.sendSeen(username, sender);
-            m.setSeen(true);
         }
 
         if (otherUser.equals(selectedUser)) {
             drawMessage(m);
         }
+
+        updateUsersListUI();
     }
 
     private void drawMessage(Message m) {
@@ -416,67 +516,37 @@ public class UIController {
     }
 
     // ================= USERS =================
-    private void updateUsers(String msg) {
 
-        String[] parts = msg.split("\\|");
-
-        String onlinePart = parts[0].replace("USERS:", "");
-        String allPart = parts[1].replace("ALL:", "");
-
-        onlineUsers.clear();
-        allUsersUI.clear();
-
-        if (!allPart.isEmpty()) {
-            allUsersUI.addAll(Arrays.asList(allPart.split(",")));
-        }
-
-        if (!onlinePart.isEmpty()) {
-            onlineUsers.addAll(Arrays.asList(onlinePart.split(",")));
-        }
-
-        allUsersUI.remove(username);
-
-        updateUsersListUI();
-    }
 
     private void updateUsersListUI() {
 
         contactsList.getItems().clear();
 
-        for (String user : allUsersUI) {
+        Set<String> display = new LinkedHashSet<>();
+
+        // 🔥 contacts from server
+        for (String u : contactsFromServer) {
+            if (!deletedUsers.contains(u) && !u.equals(username)) {
+                display.add(u);
+            }
+        }
+
+        // 🔥 users from chat/messages
+        for (String u : chatUsers) {
+            if (!deletedUsers.contains(u) && !u.equals(username)) {
+                display.add(u);
+            }
+        }
+
+        for (String user : display) {
 
             int count = unreadCount.getOrDefault(user, 0);
 
-            String display = "● " + user;
+            String text = "● " + user;
 
-            if (count > 0) display += " (" + count + ")";
+            if (count > 0) text += " (" + count + ")";
 
-            contactsList.getItems().add(display);
+            contactsList.getItems().add(text);
         }
-
-        contactsList.setCellFactory(list -> new ListCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
-                    return;
-                }
-
-                setText(item);
-
-                String usernameOnly = item.replaceAll("^● ", "")
-                        .replaceAll("\\(\\d+\\)", "")
-                        .trim();
-
-                if (onlineUsers.contains(usernameOnly)) {
-                    setStyle("-fx-text-fill: #27ae60;");
-                } else {
-                    setStyle("-fx-text-fill: #888888;");
-                }
-            }
-        });
     }
 }
