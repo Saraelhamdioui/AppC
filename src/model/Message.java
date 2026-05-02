@@ -17,7 +17,7 @@ public class Message {
     public String getSender() { return sender; }
     public String getReceiver() { return receiver; }
     public String getContent() { return content; }
-    public String getType() { return type; }
+
 
     public boolean isSeen() { return seen; }
     public void setSeen(boolean seen) { this.seen = seen; }

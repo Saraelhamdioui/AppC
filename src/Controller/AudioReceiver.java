@@ -30,14 +30,15 @@ public class AudioReceiver implements Runnable {
 
             byte[] buffer = new byte[4096];
 
-            // 👇 HERE (المكان الصحيح)
             while (running && !socket.isClosed()) {
 
                 int bytesRead = in.read(buffer);
 
                 if (bytesRead == -1) break;
 
-                speakers.write(buffer, 0, bytesRead);
+                if (bytesRead > 0) {
+                    speakers.write(buffer, 0, bytesRead);
+                }
             }
 
         } catch (Exception e) {
