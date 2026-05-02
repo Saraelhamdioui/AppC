@@ -30,7 +30,6 @@ public class AudioSender {
 
             byte[] buffer = new byte[4096];
 
-            // 👇 HERE (position)
             while (running && !socket.isClosed()) {
 
                 int count = mic.read(buffer, 0, buffer.length);

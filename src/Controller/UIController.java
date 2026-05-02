@@ -77,7 +77,7 @@ public class UIController {
         callBox = new HBox(10);
         callBox.setAlignment(Pos.CENTER);
 
-        Label label = new Label("📞 In call with " + otherUser);
+        Label label = new Label(" In call with " + otherUser);
         label.setStyle("-fx-text-fill:white;");
 
         timerLabel = new Label("00:00");
@@ -112,9 +112,6 @@ public class UIController {
         });
     }
 
-    // =========================
-    // STOP CALL UI
-    // =========================
     private void stopCallUI() {
         if (callBox != null) {
             messagesBox.getChildren().remove(callBox);
@@ -133,14 +130,12 @@ public class UIController {
 
     private CallDao callDao = new CallDao();
 
-    // 💬 data
     private Map<String, List<Message>> conversations = new HashMap<>();
     private Map<String, Integer> unreadCount = new HashMap<>();
 
     private List<String> allUsersUI = new ArrayList<>();
     private Set<String> onlineUsers = new HashSet<>();
 
-    // ================= INIT =================
     public void setUsername(String username) {
 
         this.username = username;
@@ -185,7 +180,6 @@ public class UIController {
                 } else if (msg.startsWith("SEEN:")) {
                     markSeen();
 
-                    // ================= CALL REQUEST =================
                 } else if (msg.startsWith("CALL_REQUEST")) {
 
                     String[] p = msg.split(":");
@@ -195,7 +189,6 @@ public class UIController {
                     drawCallRequest(caller);
 
 
-                    // ================= CALL ACCEPT =================
                 } else if (msg.startsWith("CALL_ACCEPT")) {
 
                     String[] p = msg.split(":");
@@ -210,33 +203,24 @@ public class UIController {
                         }
                     }
 
-                    // 🔥 1. reset old UI first
                     stopCallUI();
 
-                    // 🔥 2. set state
                     selectedUser = otherUser;
                     callStartTime = System.currentTimeMillis();
-
-                    // 🔥 3. UI first
                     startCallUI(otherUser);
                     endCallBtn.setVisible(true);
 
-                    // 🔥 4. audio last (important)
                     startAudioCallSession();
 
-                    // ================= CALL END =================
                 } else if (msg.startsWith("CALL_END")) {
 
                     String[] p = msg.split(":");
                     String other = p.length > 1 ? p[1] : "User";
 
-                    // 🔥 stop audio
                     stopAudioCall();
 
-                    // 🔥 stop UI call (VERY IMPORTANT)
                     stopCallUI();
 
-                    // ❌ ما تديرش DB هنا (server هو المسؤول)
                     endCallBtn.setVisible(false);
 
                     long duration = (System.currentTimeMillis() - callStartTime) / 1000;
@@ -268,7 +252,6 @@ public class UIController {
         messageField.clear();
     }
 
-    // ================= CALL BUTTONS =================
     @FXML
     public void startAudioCall() {
 
@@ -300,16 +283,13 @@ public class UIController {
         try {
             Socket audioSocket = new Socket("localhost", 5001);
 
-            // 🔥 send callId FIRST
             DataOutputStream dos = new DataOutputStream(audioSocket.getOutputStream());
             dos.writeInt(currentCallId);
             dos.flush();
 
-            // 🎤 start sending audio
             sender = new AudioSender(audioSocket);
             new Thread(() -> sender.start()).start();
 
-            // 🔊 start receiving audio
             receiver = new AudioReceiver(audioSocket);
             receiverThread = new Thread(receiver);
             receiverThread.start();

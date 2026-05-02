@@ -8,9 +8,6 @@ import java.util.concurrent.*;
 
 public class Server {
 
-    // =========================
-    // 💬 CHAT SYSTEM
-    // =========================
     public static ConcurrentHashMap<String, ClientHandler> clients = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<String, Boolean> allUsers = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<String, Integer> activeCalls = new ConcurrentHashMap<>();
@@ -37,7 +34,7 @@ public class Server {
                     out.flush();
 
                 } catch (SocketException e) {
-                    break; // 🔥 important
+                    break;
                 }
             }
 
@@ -45,18 +42,15 @@ public class Server {
             System.out.println("Audio stopped");
         }
     }
-    // 🎤 Audio pairing
 
 
     public static void main(String[] args) {
 
-        // =========================
-        // 💬 CHAT SERVER (PORT 1234)
-        // =========================
+
         new Thread(() -> {
             try (ServerSocket serverSocket = new ServerSocket(1234)) {
 
-                System.out.println("💬 Chat Server started on 1234");
+                System.out.println(" Chat Server started on 1234");
 
                 while (true) {
                     Socket socket = serverSocket.accept();
@@ -69,16 +63,14 @@ public class Server {
         }).start();
 
 
-        // =========================
-        // 🎤 AUDIO SERVER (PORT 5001)
-        // =========================
+
         new Thread(() -> {
 
             try {
 
                 ServerSocket audioServer = new ServerSocket(5001);
 
-                System.out.println("🎤 Audio Server started on 5001");
+                System.out.println(" Audio Server started on 5001");
 
                 while (true) {
 
@@ -114,9 +106,7 @@ public class Server {
     }
 
 
-    // =========================
-    // 🔊 AUDIO FORWARD
-    // =========================
+
     private static void forwardAudio(Socket inSocket, Socket outSocket) {
 
         try (InputStream in = inSocket.getInputStream();
@@ -139,26 +129,19 @@ public class Server {
         }
     }
 
-    // =========================
-    // ➕ ADD CLIENT
-    // =========================
+
     public static void addClient(String username, ClientHandler client) {
         clients.put(username, client);
         allUsers.put(username, true);
         broadcastUsers();
     }
 
-    // =========================
-    // ➖ REMOVE CLIENT
-    // =========================
     public static void removeClient(String username) {
         clients.remove(username);
         broadcastUsers();
     }
 
-    // =========================
-    // 📡 BROADCAST USERS
-    // =========================
+
     public static void broadcastUsers() {
 
         String online = String.join(",", clients.keySet());
@@ -173,9 +156,6 @@ public class Server {
         }
     }
 
-    // =========================
-    // 💬 PRIVATE MESSAGE
-    // =========================
     public static void sendPrivate(String user, String msg) {
         ClientHandler c = clients.get(user);
         if (c != null) c.send(msg);

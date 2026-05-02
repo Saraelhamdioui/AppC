@@ -18,7 +18,7 @@
                 <Insets top="12" right="20" bottom="12" left="20"/>
             </padding>
 
-            <Label text="💬 ChatApp"
+            <Label text="ChatApp"
                    style="-fx-text-fill:white; -fx-font-size:20px; -fx-font-weight:bold;"/>
 
             <Region HBox.hgrow="ALWAYS"/>
@@ -37,7 +37,7 @@
                 <Insets top="15" right="10" bottom="15" left="10"/>
             </padding>
 
-            <TextField promptText="🔍 Search"
+            <TextField promptText="Search"
                        style="-fx-background-radius:10; -fx-padding:8;"/>
 
             <Label text="Contacts"
@@ -76,8 +76,7 @@
                         <Insets top="12" right="12" bottom="12" left="12"/>
                     </padding>
 
-                    <!-- 📞 CALL BUTTONS -->
-                    <Button text="📞 Audio"
+                    <Button text=" Audio"
                             onAction="#startAudioCall"
                             style="-fx-background-color:#00a884; -fx-text-fill:white;"/>
 
@@ -85,11 +84,10 @@
                             onAction="#startVideoCall"
                             style="-fx-background-color:#128C7E; -fx-text-fill:white;"/>
                     <Button fx:id="endCallBtn"
-                            text="❌ End"
+                            text="End"
                             visible="false"
                             onAction="#endCall"
                             style="-fx-background-color:red; -fx-text-fill:white;"/>
-                    <!-- 💬 MESSAGE INPUT -->
                     <TextField fx:id="messageField"
                                HBox.hgrow="ALWAYS"
                                promptText="Type a message..."

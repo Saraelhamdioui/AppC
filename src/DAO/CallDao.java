@@ -4,9 +4,6 @@ import java.sql.*;
 
 public class CallDao {
 
-    // =========================
-    // 📞 START CALL
-    // =========================
     public int startCall(String caller, String callee, String type) {
 
         String sql = "INSERT INTO calls (caller, callee, type, status, start_time) " +
@@ -24,7 +21,7 @@ public class CallDao {
             ResultSet rs = ps.getGeneratedKeys();
 
             if (rs.next()) {
-                return rs.getInt(1); // 🔥 call_id
+                return rs.getInt(1);
             }
 
         } catch (Exception e) {
