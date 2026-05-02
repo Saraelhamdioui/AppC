@@ -1,4 +1,4 @@
-package DAO;
+package dao;
 
 import model.Message;
 import java.sql.*;
@@ -19,7 +19,6 @@ public class MessageDao {
             ps.setBoolean(4, m.isSeen());
 
             ps.executeUpdate();
-
         } catch (Exception e) {
             e.printStackTrace();
         }

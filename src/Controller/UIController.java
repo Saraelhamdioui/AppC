@@ -1,482 +1,352 @@
-package Controller;
+package controller;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
-import model.Message;
-import DAO.CallDao;
+import javafx.scene.text.Font;
+import network.Protocol;
+
 import java.io.DataOutputStream;
 import java.net.Socket;
 import java.util.*;
 
 public class UIController {
 
+    @FXML private Label statusLabel;
+    @FXML private ListView<String> contactsList;
+    @FXML private ImageView videoImageView;
     @FXML private VBox messagesBox;
     @FXML private TextField messageField;
-    @FXML private ListView<String> contactsList;
     @FXML private Button endCallBtn;
 
     private Client client;
     private String username;
     private String selectedUser;
+    private String serverIp;
 
-    private HBox callBox;
-    private Label timerLabel;
-    private long startTime;
-    private AudioReceiver receiver;
-    private volatile boolean audioStopped = false;
+    private Map<String, List<String[]>> conversations = new HashMap<>();
 
-    private void drawCallRequest(String caller) {
+    private AudioSender   audioSender;
+    private AudioReceiver audioReceiver;
+    private VideoSender   videoSender;
+    private VideoReceiver videoReceiver;
 
-        HBox box = new HBox();
-        box.setAlignment(Pos.CENTER_LEFT);
+    private Socket audioSendSocket;
+    private Socket audioRecvSocket;
+    private Socket videoSendSocket;
+    private Socket videoRecvSocket;
 
-        VBox card = new VBox(10);
-        card.setStyle("-fx-background-color:#1f2c34; -fx-padding:10; -fx-background-radius:12;");
-
-        Label text = new Label("📞 " + caller + " is calling...");
-        text.setStyle("-fx-text-fill:white;");
-
-        HBox buttons = new HBox(10);
-
-        Button accept = new Button("Accept");
-        Button reject = new Button("Reject");
-
-        accept.setStyle("-fx-background-color:#00a884; -fx-text-fill:white;");
-        reject.setStyle("-fx-background-color:red; -fx-text-fill:white;");
-
-        buttons.getChildren().addAll(accept, reject);
-
-        card.getChildren().addAll(text, buttons);
-        box.getChildren().add(card);
-
-        messagesBox.getChildren().add(box);
-
-        // ================= handlers =================
-        accept.setOnAction(e -> {
-            client.acceptCall(username, caller);
-            messagesBox.getChildren().remove(box);
-            startCallUI(caller);
-        });
-
-        reject.setOnAction(e -> {
-            client.rejectCall(username, caller);
-            messagesBox.getChildren().remove(box);
-        });
-    }
-    // =========================
-    // CALL ACTIVE UI
-    // =========================
-    private void startCallUI(String otherUser) {
-        if (callBox != null) {
-            messagesBox.getChildren().remove(callBox);
-            callBox = null;
-        }
-        callBox = new HBox(10);
-        callBox.setAlignment(Pos.CENTER);
-
-        Label label = new Label("📞 In call with " + otherUser);
-        label.setStyle("-fx-text-fill:white;");
-
-        timerLabel = new Label("00:00");
-        timerLabel.setStyle("-fx-text-fill:#00ffcc;");
-
-        Button end = new Button("End");
-        end.setStyle("-fx-background-color:red; -fx-text-fill:white;");
-
-        callBox.getChildren().addAll(label, timerLabel, end);
-
-        messagesBox.getChildren().add(callBox);
-
-        startTime = System.currentTimeMillis();
-
-        new Thread(() -> {
-            try {
-                while (callBox != null) {
-
-                    long sec = (System.currentTimeMillis() - startTime) / 1000;
-                    String time = String.format("%02d:%02d", sec / 60, sec % 60);
-
-                    Platform.runLater(() -> timerLabel.setText(time));
-
-                    Thread.sleep(1000);
-                }
-            } catch (Exception ignored) {}
-        }).start();
-
-        end.setOnAction(e -> {
-            client.endCall(username, otherUser);
-            stopCallUI();
-        });
-    }
-
-    // =========================
-    // STOP CALL UI
-    // =========================
-    private void stopCallUI() {
-        if (callBox != null) {
-            messagesBox.getChildren().remove(callBox);
-            callBox = null;
-        }
-    }
-
-    // 🎤 Audio
-    private AudioSender sender;
-    private Thread receiverThread;
-
-    // ⏱ Call info
-    private long callStartTime;
-    private int currentCallId;
-
-    private CallDao callDao = new CallDao();
-
-    // 💬 data
-    private Map<String, List<Message>> conversations = new HashMap<>();
-    private Map<String, Integer> unreadCount = new HashMap<>();
-
-    private List<String> allUsersUI = new ArrayList<>();
-    private Set<String> onlineUsers = new HashSet<>();
+    private int     currentCallId   = -1;
+    private String  currentCallType = "audio";
+    private boolean callActive      = false;
 
     // ================= INIT =================
-    public void setUsername(String username) {
-
+    public void init(String serverIp, String username) {
+        this.serverIp = serverIp;
         this.username = username;
 
-        contactsList.setOnMouseClicked(e -> {
-
-            int index = contactsList.getSelectionModel().getSelectedIndex();
-            if (index == -1) return;
-
-            selectedUser = allUsersUI.get(index);
-
-            messagesBox.getChildren().clear();
-
-            conversations.putIfAbsent(selectedUser, new ArrayList<>());
-
-            for (Message m : conversations.get(selectedUser)) {
-                drawMessage(m);
-            }
-
-            unreadCount.put(selectedUser, 0);
-            updateUsersListUI();
-
-            client.sendSeen(username, selectedUser);
-            markSeen();
-        });
-
-        client = new Client();
+        client = new Client(serverIp);
         client.login(username);
 
-        client.listen(msg -> {
-            Platform.runLater(() -> {
-
-                // USERS
-                if (msg.startsWith("USERS:")) {
-                    updateUsers(msg);
-
-                    // HISTORY
-                } else if (msg.startsWith("HISTORY:")) {
-                    addMessage(msg.replace("HISTORY:", ""));
-
-                    // SEEN
-                } else if (msg.startsWith("SEEN:")) {
-                    markSeen();
-
-                    // ================= CALL REQUEST =================
-                } else if (msg.startsWith("CALL_REQUEST")) {
-
-                    String[] p = msg.split(":");
-                    String caller = p[1];
-                    String type = p[2];
-
-                    drawCallRequest(caller);
-
-
-                    // ================= CALL ACCEPT =================
-                } else if (msg.startsWith("CALL_ACCEPT")) {
-
-                    String[] p = msg.split(":");
-
-                    String otherUser = p[1];
-
-                    if (p.length >= 3) {
-                        try {
-                            currentCallId = Integer.parseInt(p[2]);
-                        } catch (Exception e) {
-                            currentCallId = -1;
-                        }
+        contactsList.getSelectionModel().selectedItemProperty().addListener(
+                (obs, old, selected) -> {
+                    if (selected != null) {
+                        selectedUser = selected;
+                        displayConversation(selectedUser);
+                        client.sendSeen(username, selectedUser);
                     }
-
-                    // 🔥 1. reset old UI first
-                    stopCallUI();
-
-                    // 🔥 2. set state
-                    selectedUser = otherUser;
-                    callStartTime = System.currentTimeMillis();
-
-                    // 🔥 3. UI first
-                    startCallUI(otherUser);
-                    endCallBtn.setVisible(true);
-
-                    // 🔥 4. audio last (important)
-                    startAudioCallSession();
-
-                    // ================= CALL END =================
-                } else if (msg.startsWith("CALL_END")) {
-
-                    String[] p = msg.split(":");
-                    String other = p.length > 1 ? p[1] : "User";
-
-                    // 🔥 stop audio
-                    stopAudioCall();
-
-                    // 🔥 stop UI call (VERY IMPORTANT)
-                    stopCallUI();
-
-                    // ❌ ما تديرش DB هنا (server هو المسؤول)
-                    endCallBtn.setVisible(false);
-
-                    long duration = (System.currentTimeMillis() - callStartTime) / 1000;
-
-                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                    alert.setHeaderText(
-                            "Call ended with " + other +
-                                    "\nDuration: " + duration + " sec"
-                    );
-                    alert.showAndWait();
-
-                    // CHAT
-                } else {
-                    addMessage(msg);
                 }
-            });
-        });
+        );
+
+        client.listen(msg -> Platform.runLater(() -> handleIncoming(msg)));
     }
 
-    // ================= CHAT =================
+    // ================= INCOMING MESSAGES =================
+    private void handleIncoming(String msg) {
+
+        // --- USERS ---
+        if (msg.startsWith("USERS:")) {
+            String[] split = msg.substring(6).split("\\|ALL:");
+            String[] online = split[0].isEmpty() ? new String[0] : split[0].split(",");
+            String[] all    = split.length > 1 && !split[1].isEmpty()
+                    ? split[1].split(",") : new String[0];
+
+            Set<String> allSet = new LinkedHashSet<>();
+            for (String u : all)    if (!u.equals(username)) allSet.add(u);
+            for (String u : online) if (!u.equals(username)) allSet.add(u);
+            contactsList.getItems().setAll(new ArrayList<>(allSet));
+
+            // --- MSG / HISTORY ---
+        } else if (msg.startsWith(Protocol.MSG + ":") ||
+                msg.startsWith(Protocol.HISTORY + ":")) {
+
+            String[] p = msg.split(":", 4);
+            if (p.length < 4) return;
+            String sender  = p[1];
+            String receiver = p[2];
+            String content  = p[3];
+
+            String key = conversationKey(sender, receiver);
+            conversations.computeIfAbsent(key, k -> new ArrayList<>())
+                    .add(new String[]{sender, content});
+
+            String peer = sender.equals(username) ? receiver : sender;
+            if (peer.equals(selectedUser)) {
+                addMessageBubble(sender, content);
+            }
+
+            // --- CALL_REQUEST : quelqu'un nous appelle ---
+            // Format serveur : CALL_REQUEST:caller:type
+        } else if (msg.startsWith(Protocol.CALL_REQUEST + ":")) {
+            String[] p = msg.split(":", 3);
+            if (p.length < 3) return;
+            String caller    = p[1];
+            String type      = p[2]; // "audio" ou "video"
+            currentCallType  = type; // ← on sauvegarde ici pour le receveur
+
+            System.out.println("[APPEL ENTRANT] caller=" + caller + " type=" + type);
+
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Appel entrant");
+            alert.setHeaderText(caller + " vous appelle (" + type + ")");
+            alert.setContentText("Accepter ?");
+
+            ButtonType acceptBtn = new ButtonType("Accepter");
+            ButtonType rejectBtn = new ButtonType("Refuser", ButtonBar.ButtonData.CANCEL_CLOSE);
+            alert.getButtonTypes().setAll(acceptBtn, rejectBtn);
+
+            alert.showAndWait().ifPresent(result -> {
+                if (result == acceptBtn) {
+                    client.acceptCall(username, caller);
+                    setStatus("Appel en cours avec " + caller + "...");
+                } else {
+                    client.rejectCall(username, caller);
+                    currentCallType = "audio"; // reset
+                }
+            });
+
+            // --- CALL_ACCEPT : appel accepté → démarrer la session media ---
+            // Format serveur : CALL_ACCEPT:autreUser:callId
+        } else if (msg.startsWith(Protocol.CALL_ACCEPT + ":")) {
+            String[] p = msg.split(":", 3);
+            if (p.length < 3) return;
+            String otherUser = p[1];
+            try {
+                currentCallId = Integer.parseInt(p[2].trim());
+            } catch (NumberFormatException e) {
+                currentCallId = 0;
+            }
+            callActive = true;
+
+            System.out.println("[CALL_ACCEPT] otherUser=" + otherUser
+                    + " callId=" + currentCallId + " type=" + currentCallType);
+
+            setStatus("Appel en cours avec " + otherUser);
+            Platform.runLater(() -> {
+                if (endCallBtn != null) endCallBtn.setVisible(true);
+            });
+
+            // Toujours démarrer l'audio
+            startAudioCallSession();
+
+            // Démarrer la vidéo seulement si c'est un appel vidéo
+            if ("video".equals(currentCallType)) {
+                System.out.println("[VIDEO] Démarrage session vidéo...");
+                startVideoCallSession();
+            } else {
+                System.out.println("[AUDIO] Appel audio uniquement.");
+            }
+
+            // --- CALL_REJECT ---
+        } else if (msg.startsWith(Protocol.CALL_REJECT + ":")) {
+            String[] p   = msg.split(":", 2);
+            String who   = p.length > 1 ? p[1] : "L'utilisateur";
+            currentCallType = "audio";
+            setStatus(who + " a refusé l'appel.");
+            Alert info = new Alert(Alert.AlertType.INFORMATION,
+                    who + " a refusé votre appel.", ButtonType.OK);
+            info.show();
+
+            // --- CALL_END ---
+        } else if (msg.startsWith(Protocol.CALL_END + ":")) {
+            if (!callActive) return;
+            callActive      = false;
+            currentCallType = "audio";
+            stopAudioCall();
+            stopVideoCall();
+            currentCallId = -1;
+            Platform.runLater(() -> {
+                if (endCallBtn != null) endCallBtn.setVisible(false);
+            });
+            setStatus("Appel terminé");
+        }
+    }
+
+    // ================= AFFICHAGE MESSAGES =================
+    private void displayConversation(String peer) {
+        messagesBox.getChildren().clear();
+        String key = conversationKey(username, peer);
+        List<String[]> msgs = conversations.getOrDefault(key, Collections.emptyList());
+        List<String[]> copy = new ArrayList<>(msgs);
+        for (String[] m : copy) {
+            addMessageBubbleNow(m[0], m[1]);
+        }
+    }
+
+    private void addMessageBubble(String sender, String content) {
+        // Vérifier que le message appartient à la conversation affichée
+        String peer = sender.equals(username) ? selectedUser : sender;
+        if (peer == null || !peer.equals(selectedUser)) return;
+        addMessageBubbleNow(sender, content);
+    }
+
+    private void addMessageBubbleNow(String sender, String content) {
+        boolean isMe = sender.equals(username);
+
+        Label bubble = new Label(content);
+        bubble.setWrapText(true);
+        bubble.setMaxWidth(350);
+        bubble.setPadding(new Insets(8));
+        bubble.setFont(Font.font(14));
+        bubble.setStyle(isMe
+                ? "-fx-background-color:#005c4b; -fx-background-radius:12; -fx-text-fill:white;"
+                : "-fx-background-color:#202c33; -fx-background-radius:12; -fx-text-fill:white;");
+
+        HBox row = new HBox(bubble);
+        row.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
+        row.setPadding(new Insets(2, 8, 2, 8));
+        messagesBox.getChildren().add(row);
+    }
+
+    // ================= ACTIONS =================
     @FXML
     public void sendMessage() {
-
-        String msg = messageField.getText();
-
-        if (msg.isEmpty() || selectedUser == null) return;
-
-        client.sendMessage(username, selectedUser, msg);
+        String text = messageField.getText().trim();
+        if (text.isEmpty() || selectedUser == null) return;
+        client.sendMessage(username, selectedUser, text);
         messageField.clear();
     }
 
-    // ================= CALL BUTTONS =================
     @FXML
     public void startAudioCall() {
-
         if (selectedUser == null) return;
-
+        currentCallType = "audio";
+        System.out.println("[ACTION] Appel audio vers " + selectedUser);
         client.sendCallRequest(username, selectedUser, "audio");
+        setStatus("Appel audio vers " + selectedUser + "...");
     }
 
     @FXML
     public void startVideoCall() {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Video Call");
-        alert.setHeaderText(null);
-        alert.setContentText("Video call is not implemented yet,please wait till next update, thank youuuu!.");
-        alert.showAndWait();
+        if (selectedUser == null) return;
+        currentCallType = "video";
+        System.out.println("[ACTION] Appel vidéo vers " + selectedUser);
+        client.sendCallRequest(username, selectedUser, "video");
+        setStatus("Appel vidéo vers " + selectedUser + "...");
     }
 
     @FXML
     public void endCall() {
-        if (selectedUser != null) {
-            client.endCall(username, selectedUser);
-            stopAudioCall();
-            endCallBtn.setVisible(false);
-        }
+        if (selectedUser == null || !callActive) return;
+        callActive      = false;
+        currentCallType = "audio";
+        client.endCall(username, selectedUser);
+        stopAudioCall();
+        stopVideoCall();
+        currentCallId = -1;
+        endCallBtn.setVisible(false);
+        setStatus("Appel terminé");
     }
 
-    // ================= AUDIO CALL =================
+    // ================= AUDIO =================
     private void startAudioCallSession() {
-        audioStopped = false;
-        try {
-            Socket audioSocket = new Socket("localhost", 5001);
+        new Thread(() -> {
+            try {
+                System.out.println("[AUDIO] Connexion socket send...");
+                audioSendSocket = new Socket(serverIp, Client.AUDIO_PORT);
+                DataOutputStream dosSend = new DataOutputStream(audioSendSocket.getOutputStream());
+                dosSend.writeInt(currentCallId);
+                dosSend.writeByte('S');
+                dosSend.flush();
 
-            // 🔥 send callId FIRST
-            DataOutputStream dos = new DataOutputStream(audioSocket.getOutputStream());
-            dos.writeInt(currentCallId);
-            dos.flush();
+                System.out.println("[AUDIO] Connexion socket recv...");
+                audioRecvSocket = new Socket(serverIp, Client.AUDIO_PORT);
+                DataOutputStream dosRecv = new DataOutputStream(audioRecvSocket.getOutputStream());
+                dosRecv.writeInt(currentCallId);
+                dosRecv.writeByte('R');
+                dosRecv.flush();
 
-            // 🎤 start sending audio
-            sender = new AudioSender(audioSocket);
-            new Thread(() -> sender.start()).start();
+                audioSender   = new AudioSender(audioSendSocket);
+                audioReceiver = new AudioReceiver(audioRecvSocket);
 
-            // 🔊 start receiving audio
-            receiver = new AudioReceiver(audioSocket);
-            receiverThread = new Thread(receiver);
-            receiverThread.start();
+                new Thread(audioSender::start).start();
+                new Thread(audioReceiver).start();
+                System.out.println("[AUDIO] Session audio démarrée ✅");
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> setStatus("Erreur audio : " + e.getMessage()));
+            }
+        }).start();
     }
 
     private void stopAudioCall() {
-
-        if (audioStopped) return;
-        audioStopped = true;
-
-        try {
-            if (sender != null) sender.stop();
-            if (receiver != null) receiver.stop();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        if (audioSender   != null) { audioSender.stop();   audioSender   = null; }
+        if (audioReceiver != null) { audioReceiver.stop(); audioReceiver = null; }
     }
 
-    // ================= MESSAGES =================
-    private void addMessage(String msg) {
+    // ================= VIDEO =================
+    private void startVideoCallSession() {
+        new Thread(() -> {
+            try {
+                System.out.println("[VIDEO] Connexion socket send (S)...");
+                videoSendSocket = new Socket(serverIp, Client.VIDEO_PORT);
+                DataOutputStream dosSend = new DataOutputStream(videoSendSocket.getOutputStream());
+                dosSend.writeInt(currentCallId);
+                dosSend.writeByte('S');
+                dosSend.flush();
 
-        String[] parts = msg.split(":", 3);
+                System.out.println("[VIDEO] Connexion socket recv (R)...");
+                videoRecvSocket = new Socket(serverIp, Client.VIDEO_PORT);
+                DataOutputStream dosRecv = new DataOutputStream(videoRecvSocket.getOutputStream());
+                dosRecv.writeInt(currentCallId);
+                dosRecv.writeByte('R');
+                dosRecv.flush();
 
-        String sender = parts[0];
-        String receiver = parts[1];
-        String content = parts[2];
+                videoSender   = new VideoSender(videoSendSocket);
+                videoReceiver = new VideoReceiver(videoRecvSocket, videoImageView);
 
-        String otherUser = sender.equals(username) ? receiver : sender;
+                new Thread(videoSender).start();
+                new Thread(videoReceiver).start();
+                System.out.println("[VIDEO] Session vidéo démarrée ✅");
 
-        conversations.putIfAbsent(otherUser, new ArrayList<>());
-
-        Message m = new Message(sender, receiver, content);
-        conversations.get(otherUser).add(m);
-
-        if (!sender.equals(username) && !otherUser.equals(selectedUser)) {
-            unreadCount.put(otherUser,
-                    unreadCount.getOrDefault(otherUser, 0) + 1);
-            updateUsersListUI();
-        }
-
-        if (!sender.equals(username) && otherUser.equals(selectedUser)) {
-            client.sendSeen(username, sender);
-            m.setSeen(true);
-        }
-
-        if (otherUser.equals(selectedUser)) {
-            drawMessage(m);
-        }
-    }
-
-    private void drawMessage(Message m) {
-
-        boolean isMe = m.getSender().equals(username);
-
-        HBox box = new HBox();
-        Label label = new Label();
-
-        if (isMe) {
-            String ticks = m.isSeen() ? " ✔✔" : " ✔";
-            label.setText(m.getSender() + ": " + m.getContent() + ticks);
-        } else {
-            label.setText(m.getSender() + ": " + m.getContent());
-        }
-
-        label.setWrapText(true);
-        label.setMaxWidth(300);
-
-        label.setStyle(
-                "-fx-padding:10;" +
-                        "-fx-background-radius:15;" +
-                        (isMe
-                                ? "-fx-background-color:#00a884; -fx-text-fill:white;"
-                                : "-fx-background-color:#202c33; -fx-text-fill:white;")
-        );
-
-        box.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
-        box.getChildren().add(label);
-
-        messagesBox.getChildren().add(box);
-    }
-
-    private void markSeen() {
-
-        if (selectedUser == null) return;
-
-        List<Message> msgs = conversations.get(selectedUser);
-        if (msgs == null) return;
-
-        for (Message m : msgs) {
-            if (m.getSender().equals(username)) {
-                m.setSeen(true);
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> setStatus("Erreur vidéo : " + e.getMessage()));
             }
-        }
-
-        messagesBox.getChildren().clear();
-
-        for (Message m : msgs) {
-            drawMessage(m);
-        }
+        }).start();
     }
 
-    // ================= USERS =================
-    private void updateUsers(String msg) {
-
-        String[] parts = msg.split("\\|");
-
-        String onlinePart = parts[0].replace("USERS:", "");
-        String allPart = parts[1].replace("ALL:", "");
-
-        onlineUsers.clear();
-        allUsersUI.clear();
-
-        if (!allPart.isEmpty()) {
-            allUsersUI.addAll(Arrays.asList(allPart.split(",")));
-        }
-
-        if (!onlinePart.isEmpty()) {
-            onlineUsers.addAll(Arrays.asList(onlinePart.split(",")));
-        }
-
-        allUsersUI.remove(username);
-
-        updateUsersListUI();
+    private void stopVideoCall() {
+        if (videoSender   != null) { videoSender.stop();   videoSender   = null; }
+        if (videoReceiver != null) { videoReceiver.stop(); videoReceiver = null; }
+        Platform.runLater(() -> {
+            if (videoImageView != null) videoImageView.setImage(null);
+        });
     }
 
-    private void updateUsersListUI() {
+    // ================= UTILS =================
+    private String conversationKey(String a, String b) {
+        return a.compareTo(b) < 0 ? a + ":" + b : b + ":" + a;
+    }
 
-        contactsList.getItems().clear();
-
-        for (String user : allUsersUI) {
-
-            int count = unreadCount.getOrDefault(user, 0);
-
-            String display = "● " + user;
-
-            if (count > 0) display += " (" + count + ")";
-
-            contactsList.getItems().add(display);
-        }
-
-        contactsList.setCellFactory(list -> new ListCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
-                    return;
-                }
-
-                setText(item);
-
-                String usernameOnly = item.replaceAll("^● ", "")
-                        .replaceAll("\\(\\d+\\)", "")
-                        .trim();
-
-                if (onlineUsers.contains(usernameOnly)) {
-                    setStyle("-fx-text-fill: #27ae60;");
-                } else {
-                    setStyle("-fx-text-fill: #888888;");
-                }
-            }
+    private void setStatus(String text) {
+        Platform.runLater(() -> {
+            if (statusLabel != null) statusLabel.setText(text);
         });
     }
 }
