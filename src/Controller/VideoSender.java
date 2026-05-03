@@ -1,4 +1,4 @@
-package controller;
+package Controller;
 
 import org.opencv.core.Core;
 import org.opencv.core.Mat;

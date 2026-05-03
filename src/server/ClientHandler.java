@@ -1,9 +1,9 @@
 package server;
 
 import network.Protocol;
-import dao.MessageDao;
-import dao.UserDao;
-import dao.CallDao;
+import DAO.MessageDao;
+import DAO.UserDao;
+import DAO.CallDao;
 import model.User;
 import model.Message;
 
