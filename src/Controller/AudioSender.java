@@ -17,36 +17,32 @@ public class AudioSender {
 
     public void start() {
 
-        new Thread(() -> {
+        try {
+            AudioFormat format = getFormat();
 
-            try {
-                AudioFormat format = getFormat();
+            DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
 
-                DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+            mic = (TargetDataLine) AudioSystem.getLine(info);
+            mic.open(format);
+            mic.start();
 
-                mic = (TargetDataLine) AudioSystem.getLine(info);
-                mic.open(format);
-                mic.start();
+            out = socket.getOutputStream();
 
-                out = socket.getOutputStream();
+            byte[] buffer = new byte[4096];
 
-                byte[] buffer = new byte[4096];
+            // 👇 HERE (position)
+            while (running && !socket.isClosed()) {
 
-                while (running && !socket.isClosed()) {
+                int count = mic.read(buffer, 0, buffer.length);
 
-                    int count = mic.read(buffer, 0, buffer.length);
-
-                    if (count > 0) {
-                        out.write(buffer, 0, count);
-                        out.flush(); // 🔥 IMPORTANT
-                    }
+                if (count > 0) {
+                    out.write(buffer, 0, count);
                 }
-
-            } catch (Exception e) {
-                e.printStackTrace();
             }
 
-        }).start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public void stop() {
@@ -60,7 +56,7 @@ public class AudioSender {
             }
 
             if (socket != null && !socket.isClosed()) {
-                socket.close();
+                socket.close(); // فقط close
             }
 
         } catch (Exception e) {

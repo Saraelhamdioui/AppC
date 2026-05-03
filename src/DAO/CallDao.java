@@ -4,6 +4,9 @@ import java.sql.*;
 
 public class CallDao {
 
+    // =========================
+    // 📞 START CALL
+    // =========================
     public int startCall(String caller, String callee, String type) {
 
         String sql = "INSERT INTO calls (caller, callee, type, status, start_time) " +
@@ -31,7 +34,9 @@ public class CallDao {
         return -1;
     }
 
-
+    // =========================
+    // ⏹ END CALL
+    // =========================
     public void endCall(int callId) {
 
         String sql =
@@ -51,5 +56,30 @@ public class CallDao {
             e.printStackTrace();
         }
     }
+    public int getActiveCallId(String u1, String u2) {
 
+        String sql = "SELECT id FROM calls WHERE " +
+                "((caller=? AND callee=?) OR (caller=? AND callee=?)) " +
+                "AND status='ongoing' ORDER BY id DESC LIMIT 1";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, u1);
+            ps.setString(2, u2);
+            ps.setString(3, u2);
+            ps.setString(4, u1);
+
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt("id");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return -1;
+    }
 }

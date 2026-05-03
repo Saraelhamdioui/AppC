@@ -19,7 +19,6 @@ public class MessageDao {
             ps.setBoolean(4, m.isSeen());
 
             ps.executeUpdate();
-
         } catch (Exception e) {
             e.printStackTrace();
         }
