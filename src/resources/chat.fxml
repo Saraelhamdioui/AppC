@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.geometry.Insets?>
+
+<BorderPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="Controller.UIController"
+            prefWidth="1100" prefHeight="700"
+            style="-fx-background-color: #111b21;">
+
+    <!-- ========== BARRE DU HAUT ========== -->
+    <top>
+        <HBox spacing="12" alignment="CENTER_LEFT"
+              style="-fx-background-color: #202c33; -fx-padding: 10 16 10 16;">
+
+            <Label text="💬 ChatApp"
+                   style="-fx-text-fill: #e9edef; -fx-font-size: 18px; -fx-font-weight: bold;"/>
+
+            <Region HBox.hgrow="ALWAYS"/>
+
+            <Label fx:id="statusLabel"
+                   text="Connecté"
+                   style="-fx-text-fill: #8696a0; -fx-font-size: 13px;"/>
+        </HBox>
+    </top>
+
+    <!-- ========== PANNEAU GAUCHE : CONTACTS ========== -->
+    <left>
+        <VBox prefWidth="300"
+              style="-fx-background-color: #111b21; -fx-border-color: #222d34; -fx-border-width: 0 1 0 0;">
+
+            <!-- Barre de recherche -->
+            <HBox style="-fx-background-color: #202c33; -fx-padding: 8 12 8 12;">
+                <TextField promptText="🔍  Rechercher ou démarrer une discussion"
+                           HBox.hgrow="ALWAYS"
+                           style="-fx-background-color: #2a3942;
+                                  -fx-text-fill: #d1d7db;
+                                  -fx-prompt-text-fill: #8696a0;
+                                  -fx-background-radius: 8;
+                                  -fx-padding: 8 12 8 12;
+                                  -fx-font-size: 13px;
+                                  -fx-border-width: 0;"/>
+            </HBox>
+
+            <!-- Label "Contacts" -->
+            <Label text="  CONTACTS"
+                   style="-fx-text-fill: #8696a0;
+                          -fx-font-size: 11px;
+                          -fx-font-weight: bold;
+                          -fx-padding: 10 0 4 14;
+                          -fx-background-color: #111b21;"/>
+
+            <!-- Liste des contacts -->
+            <ListView fx:id="contactsList" VBox.vgrow="ALWAYS"
+                      style="-fx-background-color: #111b21;
+                             -fx-border-width: 0;
+                             -fx-background-insets: 0;
+                             -fx-padding: 0;"/>
+        </VBox>
+    </left>
+
+    <!-- ========== PANNEAU CENTRAL : CHAT ========== -->
+    <center>
+        <BorderPane style="-fx-background-color: #0b141a;">
+
+            <!-- Header du chat (nom de l'interlocuteur + boutons appel) -->
+            <top>
+                <HBox spacing="12" alignment="CENTER_LEFT"
+                      style="-fx-background-color: #202c33;
+                             -fx-padding: 10 16 10 16;
+                             -fx-border-color: #222d34;
+                             -fx-border-width: 0 0 1 0;">
+
+                    <!-- Avatar circulaire (simulé) -->
+                    <Label text="👤"
+                           style="-fx-background-color: #2a3942;
+                                  -fx-background-radius: 20;
+                                  -fx-min-width: 40; -fx-min-height: 40;
+                                  -fx-max-width: 40; -fx-max-height: 40;
+                                  -fx-alignment: center;
+                                  -fx-font-size: 18px;"/>
+
+                    <VBox spacing="2" HBox.hgrow="ALWAYS">
+                        <Label text="Sélectionnez un contact"
+                               style="-fx-text-fill: #e9edef; -fx-font-size: 15px; -fx-font-weight: bold;"/>
+                        <Label text="en ligne"
+                               style="-fx-text-fill: #8696a0; -fx-font-size: 12px;"/>
+                    </VBox>
+
+                    <!-- Bouton Appel Audio -->
+                    <Button text="📞" onAction="#startAudioCall"
+                            style="-fx-background-color: transparent;
+                                   -fx-text-fill: #8696a0;
+                                   -fx-font-size: 18px;
+                                   -fx-cursor: hand;
+                                   -fx-background-radius: 50;
+                                   -fx-min-width: 38; -fx-min-height: 38;">
+                        <tooltip><Tooltip text="Appel audio"/></tooltip>
+                    </Button>
+
+                    <!-- Bouton Appel Vidéo -->
+                    <Button text="📹" onAction="#startVideoCall"
+                            style="-fx-background-color: transparent;
+                                   -fx-text-fill: #8696a0;
+                                   -fx-font-size: 18px;
+                                   -fx-cursor: hand;
+                                   -fx-background-radius: 50;
+                                   -fx-min-width: 38; -fx-min-height: 38;">
+                        <tooltip><Tooltip text="Appel vidéo"/></tooltip>
+                    </Button>
+
+                    <!-- Bouton Fin d'appel (caché par défaut) -->
+                    <Button fx:id="endCallBtn" text="🔴 Fin" visible="false"
+                            onAction="#endCall"
+                            style="-fx-background-color: #c0392b;
+                                   -fx-text-fill: white;
+                                   -fx-font-size: 13px;
+                                   -fx-background-radius: 8;
+                                   -fx-padding: 6 12 6 12;
+                                   -fx-cursor: hand;"/>
+                </HBox>
+            </top>
+
+            <!-- Zone vidéo (masquée si pas d'appel vidéo) -->
+            <right>
+                <VBox alignment="CENTER"
+                      style="-fx-background-color: #0b141a; -fx-padding: 0;">
+                    <ImageView fx:id="videoImageView"
+                               fitWidth="280" fitHeight="210"
+                               preserveRatio="true"
+                               style="-fx-background-color: #000;"/>
+                </VBox>
+            </right>
+
+            <!-- Zone des messages -->
+            <center>
+                <ScrollPane fitToWidth="true"
+                            style="-fx-background: #0b141a;
+                                   -fx-background-color: #0b141a;
+                                   -fx-border-width: 0;">
+                    <content>
+                        <VBox fx:id="messagesBox" spacing="2"
+                              style="-fx-background-color: #0b141a;">
+                            <padding>
+                                <Insets top="12" right="12" bottom="12" left="12"/>
+                            </padding>
+                        </VBox>
+                    </content>
+                </ScrollPane>
+            </center>
+
+            <!-- Barre de saisie -->
+            <bottom>
+                <HBox spacing="10" alignment="CENTER"
+                      style="-fx-background-color: #202c33;
+                             -fx-padding: 10 16 10 16;">
+
+                    <!-- Emoji placeholder -->
+                    <Button text="😊"
+                            style="-fx-background-color: transparent;
+                                   -fx-text-fill: #8696a0;
+                                   -fx-font-size: 20px;
+                                   -fx-cursor: hand;
+                                   -fx-min-width: 36;"/>
+
+                    <!-- Champ texte -->
+                    <TextField fx:id="messageField"
+                               promptText="Écrivez un message..."
+                               HBox.hgrow="ALWAYS"
+                               onAction="#sendMessage"
+                               style="-fx-background-color: #2a3942;
+                                      -fx-text-fill: #d1d7db;
+                                      -fx-prompt-text-fill: #8696a0;
+                                      -fx-background-radius: 8;
+                                      -fx-padding: 10 14 10 14;
+                                      -fx-font-size: 14px;
+                                      -fx-border-width: 0;"/>
+
+                    <!-- Bouton Envoyer -->
+                    <Button text="➤" onAction="#sendMessage"
+                            style="-fx-background-color: #00a884;
+                                   -fx-text-fill: white;
+                                   -fx-font-size: 16px;
+                                   -fx-background-radius: 50;
+                                   -fx-min-width: 42; -fx-min-height: 42;
+                                   -fx-max-width: 42; -fx-max-height: 42;
+                                   -fx-cursor: hand;"/>
+                </HBox>
+            </bottom>
+
+        </BorderPane>
+    </center>
+
+</BorderPane>
